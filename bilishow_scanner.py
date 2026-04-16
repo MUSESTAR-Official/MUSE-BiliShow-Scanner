@@ -129,7 +129,12 @@ class BilibiliShowScanner:
         
         is_match = True
         
-        if 'sale_flag' in self.filters and self.filters['sale_flag']:
+        if 'keywords' in self.filters and self.filters['keywords']:
+            name = result['name']
+            if not any(kw.lower() in name.lower() for kw in self.filters['keywords']):
+                is_match = False
+
+        if is_match and 'sale_flag' in self.filters and self.filters['sale_flag']:
             if str(project_info.get('sale_flag', '')) not in self.filters['sale_flag']:
                 is_match = False
         
@@ -268,6 +273,10 @@ def get_user_input():
     filters = {}
     print("\n--- 过滤条件设置 (直接回车表示不限制该项, 多选请用逗号/空格分隔) ---")
     
+    keywords_input = input("关键词: ").replace(',', ' ').strip()
+    if keywords_input:
+        filters['keywords'] = [k.strip() for k in keywords_input.split() if k.strip()]
+
     sale_flag_input = input("售票状态 (例如: 未开售, 预售中, etc.): ").replace(',', ' ').strip()
     if sale_flag_input:
         filters['sale_flag'] = [s.strip() for s in sale_flag_input.split() if s.strip()]
