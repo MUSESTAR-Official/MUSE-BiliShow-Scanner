@@ -110,7 +110,9 @@ class BilibiliShowScanner:
             'name': None,
             'status': 'unknown',
             'error': None,
-            'data': None
+            'data': None,
+            'sale_start': None,
+            'sale_end': None
         }
         
         project_info = self.get_project_info(project_id)
@@ -122,6 +124,8 @@ class BilibiliShowScanner:
         result['name'] = project_info.get('name', '未知项目')
         result['status'] = 'success'
         result['data'] = project_info
+        result['sale_start'] = project_info.get('sale_start')
+        result['sale_end'] = project_info.get('sale_end')
         
         is_match = True
         
@@ -194,9 +198,11 @@ class BilibiliShowScanner:
                 print("❌ 未找到项目")
             elif result['match']:
                 match_count += 1
-                print(f"✅ 匹配: {result['name']}")
+                start_str = datetime.fromtimestamp(result['sale_start']).strftime('%Y-%m-%d %H:%M') if result['sale_start'] else "未知"
+                end_str = datetime.fromtimestamp(result['sale_end']).strftime('%Y-%m-%d %H:%M') if result['sale_end'] else "未知"
+                print(f"✅ 匹配: {result['name']} (售票: {start_str} 至 {end_str})")
             else:
-                print(f"⏭️ 不匹配: {result['name']}")
+                print(f"不匹配: {result['name']}")
             
             if i < count - 1:
                 time.sleep(interval)
@@ -213,7 +219,9 @@ class BilibiliShowScanner:
         if self.matched_projects:
             print("\n符合条件项目列表:")
             for project in self.matched_projects:
-                print(f"  ID: {project['id']} - {project['name']}")
+                start_str = datetime.fromtimestamp(project['sale_start']).strftime('%Y-%m-%d %H:%M') if project['sale_start'] else "未知"
+                end_str = datetime.fromtimestamp(project['sale_end']).strftime('%Y-%m-%d %H:%M') if project['sale_end'] else "未知"
+                print(f"  ID: {project['id']} - {project['name']} (售票: {start_str} 至 {end_str})")
     
     def save_results(self, filename: str = None):
         if filename is None:
