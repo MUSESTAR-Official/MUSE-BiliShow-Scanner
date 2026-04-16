@@ -124,41 +124,46 @@ class BilibiliShowScanner:
         result['status'] = 'success'
         result['data'] = project_info
         
-        # 过滤逻辑
+        # 过滤逻辑 (支持多选列表)
         is_match = True
         
         # 1. 售票状态 (sale_flag)
-        if 'sale_flag' in self.filters and self.filters['sale_flag'] is not None:
-            # 售票状态现在是文本匹配
-            if str(project_info.get('sale_flag', '')) != self.filters['sale_flag']:
+        if 'sale_flag' in self.filters and self.filters['sale_flag']:
+            if str(project_info.get('sale_flag', '')) not in self.filters['sale_flag']:
                 is_match = False
         
         # 2. 选座 (pick_seat)
-        if is_match and 'pick_seat' in self.filters and self.filters['pick_seat'] is not None:
-            if project_info.get('pick_seat') != self.filters['pick_seat']:
+        if is_match and 'pick_seat' in self.filters and self.filters['pick_seat']:
+            if project_info.get('pick_seat') not in self.filters['pick_seat']:
                 is_match = False
                 
         # 3. 实名 (id_bind)
-        if is_match and 'id_bind' in self.filters and self.filters['id_bind'] is not None:
-            if project_info.get('id_bind') != self.filters['id_bind']:
+        if is_match and 'id_bind' in self.filters and self.filters['id_bind']:
+            if project_info.get('id_bind') not in self.filters['id_bind']:
                 is_match = False
                 
         # 4. 联系人 (need_contact)
-        if is_match and 'need_contact' in self.filters and self.filters['need_contact'] is not None:
-            if project_info.get('need_contact') != self.filters['need_contact']:
+        if is_match and 'need_contact' in self.filters and self.filters['need_contact']:
+            if project_info.get('need_contact') not in self.filters['need_contact']:
                 is_match = False
                 
         # 5. 邮寄 (delivery_type)
-        if is_match and 'delivery_type' in self.filters and self.filters['delivery_type'] is not None:
+        if is_match and 'delivery_type' in self.filters and self.filters['delivery_type']:
             screen_list = project_info.get('screen_list', [])
             if screen_list:
                 delivery_type = screen_list[0].get('delivery_type')
-                # 邮寄: 1否，其他是
-                if self.filters['delivery_type'] == '0': # 选择"否"
-                    if delivery_type != 1:
+                
+                # 用户选择: '0'为不邮寄(1), '1'为其他(非1)
+                selected_no = '0' in self.filters['delivery_type']
+                selected_other = '1' in self.filters['delivery_type']
+                
+                if selected_no and selected_other:
+                    pass # 两者都选，等于不限
+                elif selected_no:
+                    if delivery_type != 1: # 只要不邮寄的，如果它是邮寄的就不匹配
                         is_match = False
-                elif self.filters['delivery_type'] == '1': # 选择"其他"
-                    if delivery_type == 1:
+                elif selected_other:
+                    if delivery_type == 1: # 只要邮寄的，如果它是不邮寄的就不匹配
                         is_match = False
             else:
                 is_match = False # 没有场次信息无法判断邮寄
@@ -199,7 +204,7 @@ class BilibiliShowScanner:
                 match_count += 1
                 print(f"✅ 匹配: {result['name']}")
             else:
-                print(f"不匹配: {result['name']}")
+                print(f"⏭️ 不匹配: {result['name']}")
             
             if i < count - 1:
                 time.sleep(interval)
@@ -261,33 +266,33 @@ def get_user_input():
             print("❌ 请输入有效的数字")
 
     filters = {}
-    print("\n--- 过滤条件设置 (直接回车表示不限制该项) ---")
+    print("\n--- 过滤条件设置 (直接回车表示不限制该项, 多选请用逗号/空格分隔) ---")
     
     # 1. 售票状态
-    sale_flag = input("售票状态 (例如: 未开售, 预售中, etc. 输入具体文本): ").strip()
-    if sale_flag:
-        filters['sale_flag'] = sale_flag
+    sale_flag_input = input("售票状态 (例如: 未开售, 预售中, etc.): ").replace(',', ' ').strip()
+    if sale_flag_input:
+        filters['sale_flag'] = [s.strip() for s in sale_flag_input.split() if s.strip()]
     
     # 2. 选座
-    pick_seat = input("选座 (0:否, 1:是): ").strip()
-    if pick_seat:
-        filters['pick_seat'] = int(pick_seat)
+    pick_seat_input = input("选座 (0:否, 1:是): ").replace(',', ' ').strip()
+    if pick_seat_input:
+        filters['pick_seat'] = [int(s) for s in pick_seat_input.split() if s.strip().isdigit()]
         
     # 3. 实名
-    id_bind = input("实名 (0:否, 1:单实名, 2:多实名): ").strip()
-    if id_bind:
-        filters['id_bind'] = int(id_bind)
+    id_bind_input = input("实名 (0:否, 1:单实名, 2:多实名): ").replace(',', ' ').strip()
+    if id_bind_input:
+        filters['id_bind'] = [int(s) for s in id_bind_input.split() if s.strip().isdigit()]
         
     # 4. 联系人
-    need_contact = input("联系人 (0:否, 1:是): ").strip()
-    if need_contact:
-        filters['need_contact'] = True if need_contact == '1' else False
+    need_contact_input = input("联系人 (0:否, 1:是): ").replace(',', ' ').strip()
+    if need_contact_input:
+        filters['need_contact'] = [s == '1' for s in need_contact_input.split() if s.strip().isdigit()]
         
     # 5. 邮寄
-    delivery = input("邮寄 (0:否, 1:其他): ").strip()
-    if delivery:
-        # 邮寄: 0代表不邮寄(1), 1代表其他情况
-        filters['delivery_type'] = delivery
+    delivery_input = input("邮寄 (0:否, 1:其他): ").replace(',', ' ').strip()
+    if delivery_input:
+        # 邮寄: 0代表不邮寄(delivery_type=1), 1代表其他情况(delivery_type!=1)
+        filters['delivery_type'] = [s.strip() for s in delivery_input.split() if s.strip()]
         
     return start_id, count, filters
 
