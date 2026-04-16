@@ -23,19 +23,17 @@ jobs:
 
       - name: Upgrade setuptools, wheel, and install requirements
         run: |
-          python -m pip install --upgrade pip setuptools wheel
-          pip install pyinstaller
-          pip install -r requirements.txt
+          pip install --upgrade setuptools wheel pyinstaller~=5.13.2 && pip install -r requirements.txt
 
       - name: Build Pyinstaller
         shell: pwsh
         run: |
-          pyinstaller --onefile --name "MUSE-HideBiliShow-Scanner" --version-file version_info.txt --icon=assets/icon.ico --add-data "version_info.txt;." hidebilishow_scanner.py
+          pyinstaller --onefile --name "MUSE-BiliShow-Scanner" --version-file version_info.txt --icon=assets/icon.ico --add-data "version_info.txt;." BiliShow_scanner.py
 
       - name: Upload executable to release
         uses: svenstaro/upload-release-action@v2
         with:
-          file: ./dist/MUSE-HideBiliShow-Scanner.exe
-          asset_name: MUSE-HideBiliShow-Scanner_windows_amd64_${{ github.ref_name }}.exe
+          file: ./dist/MUSE-BiliShow-Scanner.exe
+          asset_name: MUSE-BiliShow-Scanner_windows_amd64_${{ github.ref_name }}.exe
           tag: ${{ github.ref }}
           overwrite: true

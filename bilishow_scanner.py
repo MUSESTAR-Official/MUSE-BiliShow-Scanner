@@ -58,14 +58,14 @@ def show_muse_banner():
     """
     print(banner)
     version = get_version()
-    print(f"MUSE-HideBiliShow-Scanner v{version}")
+    print(f"MUSE-BiliShow-Scanner v{version}")
     print("=" * 88)
     print()
 
 
 class BilibiliShowScanner:
     
-    def __init__(self):
+    def __init__(self, filters: Dict = None):
         self.api_url = "https://show.bilibili.com/api/ticket/project/getV2?id="
         self.session = requests.Session()
         self.session.headers.update({
@@ -74,9 +74,9 @@ class BilibiliShowScanner:
             'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
             'Referer': 'https://show.bilibili.com/',
         })
-        self.hidden_projects = []
-        self.test_keywords = ["魑魅魍魉", "测试", "压力"]
+        self.matched_projects = []
         self.scan_results = []
+        self.filters = filters or {}
         
     def get_project_info(self, project_id: int) -> Optional[Dict]:
         try:
@@ -85,99 +85,123 @@ class BilibiliShowScanner:
             response.raise_for_status()
             
             data = response.json()
-            if data.get('code') == 0 or data.get('success') is True:
+            if data.get('code') == 0:
                 return data.get('data')
+            elif data.get('code') == -404:
+                # 忽略不存在的项目
+                return None
             else:
-                print(f"API返回错误 ID {project_id}: {data.get('message', '未知错误')}")
+                # print(f"API返回错误 ID {project_id}: {data.get('message', '未知错误')}")
                 return None
                 
         except requests.exceptions.RequestException as e:
-            print(f"请求失败 ID {project_id}: {str(e)}")
+            # print(f"请求失败 ID {project_id}: {str(e)}")
             return None
         except json.JSONDecodeError as e:
-            print(f"JSON解析失败 ID {project_id}: {str(e)}")
+            # print(f"JSON解析失败 ID {project_id}: {str(e)}")
             return None
         except Exception as e:
-            print(f"未知错误 ID {project_id}: {str(e)}")
+            # print(f"未知错误 ID {project_id}: {str(e)}")
             return None
     
     def scan_project(self, project_id: int) -> Dict:
         result = {
             'id': project_id,
-            'hide': None,
+            'match': False,
             'name': None,
             'status': 'unknown',
-            'error': None
+            'error': None,
+            'data': None
         }
         
         project_info = self.get_project_info(project_id)
         
         if project_info is None:
-            result['status'] = 'error'
-            result['error'] = '无法获取项目信息'
+            result['status'] = 'not_found'
             return result
         
-        result['hide'] = project_info.get('hide')
         result['name'] = project_info.get('name', '未知项目')
         result['status'] = 'success'
+        result['data'] = project_info
         
-        is_hidden = result['hide'] == 1
-        is_test = any(keyword in result['name'] for keyword in self.test_keywords)
+        # 过滤逻辑
+        is_match = True
         
-        if is_hidden or is_test:
-            result['is_test_keyword'] = is_test
-            self.hidden_projects.append(result)
+        # 1. 售票状态 (sale_flag)
+        if 'sale_flag' in self.filters and self.filters['sale_flag'] is not None:
+            # 售票状态现在是文本匹配
+            if str(project_info.get('sale_flag', '')) != self.filters['sale_flag']:
+                is_match = False
+        
+        # 2. 选座 (pick_seat)
+        if is_match and 'pick_seat' in self.filters and self.filters['pick_seat'] is not None:
+            if project_info.get('pick_seat') != self.filters['pick_seat']:
+                is_match = False
+                
+        # 3. 实名 (id_bind)
+        if is_match and 'id_bind' in self.filters and self.filters['id_bind'] is not None:
+            if project_info.get('id_bind') != self.filters['id_bind']:
+                is_match = False
+                
+        # 4. 联系人 (need_contact)
+        if is_match and 'need_contact' in self.filters and self.filters['need_contact'] is not None:
+            if project_info.get('need_contact') != self.filters['need_contact']:
+                is_match = False
+                
+        # 5. 邮寄 (delivery_type)
+        if is_match and 'delivery_type' in self.filters and self.filters['delivery_type'] is not None:
+            screen_list = project_info.get('screen_list', [])
+            if screen_list:
+                delivery_type = screen_list[0].get('delivery_type')
+                # 邮寄: 1否，其他是
+                if self.filters['delivery_type'] == '0': # 选择"否"
+                    if delivery_type != 1:
+                        is_match = False
+                elif self.filters['delivery_type'] == '1': # 选择"其他"
+                    if delivery_type == 1:
+                        is_match = False
+            else:
+                is_match = False # 没有场次信息无法判断邮寄
+            
+        if is_match:
+            result['match'] = True
+            self.matched_projects.append(result)
             
         return result
     
-    def scan_range(self, start_id: int, end_id: int, interval: float = 0.5):
-        print(f"开始扫描项目ID范围: {start_id} - {end_id}")
+    def scan_backward(self, start_id: int, count: int, interval: float = 0.5):
+        print(f"开始向前扫描项目，起始ID: {start_id}，扫描数量: {count}")
         print(f"扫描间隔: {interval}秒")
+        print(f"过滤条件: {self.filters}")
         print("-" * 60)
         
-        # 初始化实时日志文件
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_filename = f"bilibili_scan_log_{timestamp}.txt"
-        print(f"实时日志将保存到: {log_filename}")
-        
-        def write_log(message):
-            with open(log_filename, 'a', encoding='utf-8') as f:
-                f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}\n")
-        
-        total_count = end_id - start_id + 1
         scanned_count = 0
-        error_count = 0
+        match_count = 0
         
         start_time = datetime.now()
         
-        for project_id in range(start_id, end_id + 1):
+        for i in range(count):
+            project_id = start_id - i
+            if project_id <= 0:
+                break
+                
             scanned_count += 1
             
-            progress = (scanned_count / total_count) * 100
+            progress = (scanned_count / count) * 100
             print(f"[{progress:.1f}%] 扫描ID: {project_id}", end=" ")
             
             result = self.scan_project(project_id)
             self.scan_results.append(result)
             
-            if result['status'] == 'error':
-                error_count += 1
-                msg = f"❌ 错误: {result['error']}"
-                print(msg)
-                write_log(f"ID {project_id} - {msg}")
-            elif result['hide'] == 1:
-                msg = f"发现隐藏项目: {result['name']}"
-                print(msg)
-                write_log(f"ID {project_id} - [隐藏] {result['name']}")
-            elif result.get('is_test_keyword'):
-                msg = f"发现测试/压力项目: {result['name']}"
-                print(msg)
-                write_log(f"ID {project_id} - [测试/压力] {result['name']}")
+            if result['status'] == 'not_found':
+                print("❌ 未找到项目")
+            elif result['match']:
+                match_count += 1
+                print(f"✅ 匹配: {result['name']}")
             else:
-                msg = f"hide={result['hide']} - {result['name']}"
-                print(msg)
-                write_log(f"ID {project_id} - hide={result['hide']} - {result['name']}")
+                print(f"不匹配: {result['name']}")
             
-            if project_id < end_id:
+            if i < count - 1:
                 time.sleep(interval)
         
         end_time = datetime.now()
@@ -186,28 +210,25 @@ class BilibiliShowScanner:
         print("-" * 60)
         print("扫描完成!")
         print(f"总耗时: {duration}")
-        print(f"扫描总数: {total_count}")
-        print(f"成功扫描: {total_count - error_count}")
-        print(f"错误数量: {error_count}")
-        print(f"发现隐藏/测试项目: {len(self.hidden_projects)}")
+        print(f"扫描总数: {scanned_count}")
+        print(f"符合条件项目: {match_count}")
         
-        if self.hidden_projects:
-            print("\n隐藏/测试项目列表:")
-            for project in self.hidden_projects:
-                reason = "隐藏" if project.get('hide') == 1 else "测试/压力"
-                print(f"  ID: {project['id']} - [{reason}] {project['name']}")
+        if self.matched_projects:
+            print("\n符合条件项目列表:")
+            for project in self.matched_projects:
+                print(f"  ID: {project['id']} - {project['name']}")
     
     def save_results(self, filename: str = None):
         if filename is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"bilibili_scan_results_{timestamp}.json"
+            filename = f"bilibili_match_results_{timestamp}.json"
         
         results_data = {
             'scan_time': datetime.now().isoformat(),
             'total_scanned': len(self.scan_results),
-            'hidden_or_test_count': len(self.hidden_projects),
-            'hidden_or_test_projects': self.hidden_projects,
-            'all_results': self.scan_results
+            'match_count': len(self.matched_projects),
+            'filters': self.filters,
+            'matched_projects': self.matched_projects
         }
         
         try:
@@ -219,7 +240,6 @@ class BilibiliShowScanner:
 
 
 def get_user_input():
-    
     while True:
         try:
             start_id = int(input("请输入起始ID: "))
@@ -232,15 +252,44 @@ def get_user_input():
     
     while True:
         try:
-            end_id = int(input("请输入结束ID: "))
-            if end_id < start_id:
-                print("❌ 结束ID必须大于等于起始ID")
+            count = int(input("请输入向前扫描的项目数量: "))
+            if count <= 0:
+                print("❌ 数量必须大于0")
                 continue
             break
         except ValueError:
             print("❌ 请输入有效的数字")
+
+    filters = {}
+    print("\n--- 过滤条件设置 (直接回车表示不限制该项) ---")
     
-    return start_id, end_id
+    # 1. 售票状态
+    sale_flag = input("售票状态 (例如: 未开售, 预售中, etc. 输入具体文本): ").strip()
+    if sale_flag:
+        filters['sale_flag'] = sale_flag
+    
+    # 2. 选座
+    pick_seat = input("选座 (0:否, 1:是): ").strip()
+    if pick_seat:
+        filters['pick_seat'] = int(pick_seat)
+        
+    # 3. 实名
+    id_bind = input("实名 (0:否, 1:单实名, 2:多实名): ").strip()
+    if id_bind:
+        filters['id_bind'] = int(id_bind)
+        
+    # 4. 联系人
+    need_contact = input("联系人 (0:否, 1:是): ").strip()
+    if need_contact:
+        filters['need_contact'] = True if need_contact == '1' else False
+        
+    # 5. 邮寄
+    delivery = input("邮寄 (0:否, 1:其他): ").strip()
+    if delivery:
+        # 邮寄: 0代表不邮寄(1), 1代表其他情况
+        filters['delivery_type'] = delivery
+        
+    return start_id, count, filters
 
 
 def main():
@@ -248,15 +297,16 @@ def main():
         try:
             show_muse_banner()
             
-            start_id, end_id = get_user_input()
+            start_id, count, filters = get_user_input()
             
-            scanner = BilibiliShowScanner()
+            scanner = BilibiliShowScanner(filters=filters)
             
-            scanner.scan_range(start_id, end_id)
+            scanner.scan_backward(start_id, count)
             
-            save_choice = input("\n是否保存扫描结果到文件? (y/n): ").lower().strip()
-            if save_choice in ['y', 'yes', '是', '保存']:
-                scanner.save_results()
+            if scanner.matched_projects:
+                save_choice = input("\n是否保存匹配结果到文件? (y/n): ").lower().strip()
+                if save_choice in ['y', 'yes', '是', '保存']:
+                    scanner.save_results()
             
             print("\n程序执行完毕!")
             

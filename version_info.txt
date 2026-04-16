@@ -30,13 +30,13 @@ VSVersionInfo(
       StringTable(
         u'080404B0',
         [StringStruct(u'CompanyName', u'MUSESTAR'),
-        StringStruct(u'FileDescription', u'MUSE HideBiliShow Scanner'),
+        StringStruct(u'FileDescription', u'MUSE BiliShow Scanner'),
         StringStruct(u'FileVersion', u'1.0.0.0'),
-        StringStruct(u'InternalName', u'MUSE-HideBiliShow-Scanner'),
+        StringStruct(u'InternalName', u'MUSE-BiliShow-Scanner'),
         StringStruct(u'LegalCopyright', u'© 2025 MUSESTAR'),
-        StringStruct(u'OriginalFilename', u'MUSE-HideBiliShow-Scanner.exe'),
-        StringStruct(u'ProductName', u'MUSE HideBiliShow Scanner'),
-        StringStruct(u'ProductVersion', u'1.1.2')])
+        StringStruct(u'OriginalFilename', u'MUSE-BiliShow-Scanner.exe'),
+        StringStruct(u'ProductName', u'MUSE BiliShow Scanner'),
+        StringStruct(u'ProductVersion', u'1.2.0')])
       ]), 
     VarFileInfo([VarStruct(u'Translation', [2052, 1200])])
   ]
