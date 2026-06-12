@@ -126,6 +126,7 @@ class BilibiliShowScanner:
         result['data'] = project_info
         result['sale_start'] = project_info.get('sale_start')
         result['sale_end'] = project_info.get('sale_end')
+        result['hot_project'] = project_info.get('hotProject')
         
         is_match = True
         
@@ -218,7 +219,9 @@ class BilibiliShowScanner:
                 match_count += 1
                 start_str = datetime.fromtimestamp(result['sale_start']).strftime('%Y-%m-%d %H:%M') if result['sale_start'] else "未知"
                 end_str = datetime.fromtimestamp(result['sale_end']).strftime('%Y-%m-%d %H:%M') if result['sale_end'] else "未知"
-                print(f"✅ 匹配: {result['name']} (售票: {start_str} 至 {end_str})")
+                hot_val = result.get('hot_project')
+                hot_str = f" | Hot: {hot_val}" if hot_val is not None else ""
+                print(f"✅ 匹配: {result['name']} (售票: {start_str} 至 {end_str}{hot_str})")
             else:
                 print(f"不匹配: {result['name']}")
             
@@ -239,7 +242,9 @@ class BilibiliShowScanner:
             for project in self.matched_projects:
                 start_str = datetime.fromtimestamp(project['sale_start']).strftime('%Y-%m-%d %H:%M') if project['sale_start'] else "未知"
                 end_str = datetime.fromtimestamp(project['sale_end']).strftime('%Y-%m-%d %H:%M') if project['sale_end'] else "未知"
-                print(f"  ID: {project['id']} - {project['name']} (售票: {start_str} 至 {end_str})")
+                hot_val = project.get('hot_project')
+                hot_str = f" | Hot: {hot_val}" if hot_val is not None else ""
+                print(f"  ID: {project['id']} - {project['name']} (售票: {start_str} 至 {end_str}{hot_str})")
     
     def save_results(self, filename: str = None):
         if filename is None:
