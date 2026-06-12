@@ -129,45 +129,56 @@ class BilibiliShowScanner:
         
         is_match = True
         
-        if 'keywords' in self.filters and self.filters['keywords']:
-            name = result['name']
-            if not any(kw.lower() in name.lower() for kw in self.filters['keywords']):
+        if self.filters.get('scan_hidden'):
+            hide_val = project_info.get('hide')
+            if hide_val == 1:
+                is_match = True
+            elif hide_val == 0:
                 is_match = False
-
-        if is_match and 'sale_flag' in self.filters and self.filters['sale_flag']:
-            if str(project_info.get('sale_flag', '')) not in self.filters['sale_flag']:
-                is_match = False
-        
-        if is_match and 'pick_seat' in self.filters and self.filters['pick_seat']:
-            if project_info.get('pick_seat') not in self.filters['pick_seat']:
-                is_match = False
-                
-        if is_match and 'id_bind' in self.filters and self.filters['id_bind']:
-            if project_info.get('id_bind') not in self.filters['id_bind']:
-                is_match = False
-                
-        if is_match and 'need_contact' in self.filters and self.filters['need_contact']:
-            if project_info.get('need_contact') not in self.filters['need_contact']:
-                is_match = False
-                
-        if is_match and 'delivery_type' in self.filters and self.filters['delivery_type']:
-            screen_list = project_info.get('screen_list', [])
-            if screen_list:
-                delivery_type = screen_list[0].get('delivery_type')
-                
-                selected_no = '0' in self.filters['delivery_type']
-                selected_other = '1' in self.filters['delivery_type']
-                
-                if selected_no and selected_other:
-                    pass
-                elif selected_no:
-                    if delivery_type != 1:
-                        is_match = False
-                elif selected_other:
-                    if delivery_type == 1:
-                        is_match = False
             else:
                 is_match = False
+                result['hide_prompt'] = True
+                result['hide_val'] = hide_val
+        else:
+            if 'keywords' in self.filters and self.filters['keywords']:
+                name = result['name']
+                if not any(kw.lower() in name.lower() for kw in self.filters['keywords']):
+                    is_match = False
+    
+            if is_match and 'sale_flag' in self.filters and self.filters['sale_flag']:
+                if str(project_info.get('sale_flag', '')) not in self.filters['sale_flag']:
+                    is_match = False
+            
+            if is_match and 'pick_seat' in self.filters and self.filters['pick_seat']:
+                if project_info.get('pick_seat') not in self.filters['pick_seat']:
+                    is_match = False
+                    
+            if is_match and 'id_bind' in self.filters and self.filters['id_bind']:
+                if project_info.get('id_bind') not in self.filters['id_bind']:
+                    is_match = False
+                    
+            if is_match and 'need_contact' in self.filters and self.filters['need_contact']:
+                if project_info.get('need_contact') not in self.filters['need_contact']:
+                    is_match = False
+                    
+            if is_match and 'delivery_type' in self.filters and self.filters['delivery_type']:
+                screen_list = project_info.get('screen_list', [])
+                if screen_list:
+                    delivery_type = screen_list[0].get('delivery_type')
+                    
+                    selected_no = '0' in self.filters['delivery_type']
+                    selected_other = '1' in self.filters['delivery_type']
+                    
+                    if selected_no and selected_other:
+                        pass
+                    elif selected_no:
+                        if delivery_type != 1:
+                            is_match = False
+                    elif selected_other:
+                        if delivery_type == 1:
+                            is_match = False
+                else:
+                    is_match = False
             
         if is_match:
             result['match'] = True
@@ -201,6 +212,8 @@ class BilibiliShowScanner:
             
             if result['status'] == 'not_found':
                 print("❌ 未找到项目")
+            elif result.get('hide_prompt'):
+                print(f"⚠️ 提示: {result['name']} 的 hide 值为 {result['hide_val']}")
             elif result['match']:
                 match_count += 1
                 start_str = datetime.fromtimestamp(result['sale_start']).strftime('%Y-%m-%d %H:%M') if result['sale_start'] else "未知"
@@ -272,6 +285,11 @@ def get_user_input():
 
     filters = {}
     print("\n--- 过滤条件设置 (直接回车表示不限制该项, 多选请用逗号/空格分隔) ---")
+    
+    scan_hidden_input = input("是否扫描隐藏项目 (y/n, 默认n): ").strip().lower()
+    if scan_hidden_input in ['y']:
+        filters['scan_hidden'] = True
+        return start_id, count, filters
     
     keywords_input = input("关键词: ").replace(',', ' ').strip()
     if keywords_input:
