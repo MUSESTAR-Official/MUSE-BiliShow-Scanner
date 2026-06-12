@@ -66,7 +66,7 @@ def show_muse_banner():
 class BilibiliShowScanner:
     
     def __init__(self, filters: Dict = None):
-        self.api_url = "https://show.bilibili.com/api/ticket/project/getV2?id="
+        self.api_url = "https://show.bilibili.com/api/ticket/project/getV2?servicewechat&id="
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
